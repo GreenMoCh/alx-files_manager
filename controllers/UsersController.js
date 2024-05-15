@@ -1,4 +1,3 @@
-import { ObjectId } from 'mongodb';
 import sha1 from 'sha1';
 import dbClient from '../utils/db.js';
 
@@ -27,6 +26,11 @@ const UsersController = {
             console.error(err);
             return res.status(500).json({ error: 'Internal Server Error'});
         }
+    },
+
+    async getMe(req, res) {
+        const { user } = req;
+        res.status(200).json({ email: user.email, id: user._id.toString() });
     }
 };
 

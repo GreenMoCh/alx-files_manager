@@ -1,51 +1,19 @@
 import { v4 as uuidv4 } from 'uuid';
-import sha1 from 'sha1';
 import redisClient from '../utils/redis';
-import dbClient from '../utils/db';
 
-const AuthController = {
-    async getConnect(req, res) {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Basic ')) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const encodedCreedentials = authHeader.split(' ')[1];
-        const decodedCreedentials = Buffer.from(encodedCreedentials, 'base64').toString();
-        const [email, password] = decodedCreedentials.split(':');
-
-        const hashedPassword = sha1(password);
-        const user = await dbClient.client.db().collection('users').findOne({ email, password: hashedPassword });
-       
-        if (!user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
+export default class AuthController {
+    static async getConnect(req, res) {
+        const { user } = req;
         const token = uuidv4();
-        const key = `auth_${token}`;
 
-        await redisClient.client.set(key, user._id.toString(), 'EX', 86400);
-
-        return res.status(200).json({ token });
-    },
-
-    async getDisconnect(req, res) {
-        const { 'x-token': token } = req.headers;
-
-        if (!token) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const key = `auth_${token}`;
-        const userId = await redisClient.client.get(key);
-
-        if (!userId) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        await redisClient.client.del(key);
-        return res.status(204).send();
+        await redisClient.set(`auth_${token}`, user._id.toString(), 24 * 60 * 60);
+        res.status(200).json({ token });
     }
-};
 
-export default AuthController;
+    static async getDisconnect(req, res) {
+        const token = req.headers['x-token'];
+
+        await redisClient.del(`auth_${token}`);
+        res.status(204).send();
+    }
+}
