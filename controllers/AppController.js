@@ -1,18 +1,22 @@
-import dbClient from '../utils/db';
-import redisClient from '../utils/redis';
+import DBClient from '../utils/db';
+import RedisClient from '../utils/redis';
 
-export default class AppController {
+class AppController {
     static getStatus(req, res) {
-        res.status(200).json({
-            redis: redisClient.isAlive(),
-            db: dbClient.isAlive(),
-        });
+        const data = {
+            redis: RedisClient.isAlive(),
+            db: DBClient.isAlive(),
+        };
+	return res.status(200).send(data);
     }
 
     static getStatus(req, res) {
-        Promise.all([dbClient.nbUsers(), dbClient.nbFiles()])
-            .then(([userCount, filesCount]) => {
-                res.status(200).json({ users: userCount, files: filesCount });
-            });
+        const data = {
+		users: await DBClient.nbUsers(),
+		files: await DBClient.nbFiles(),
+	};
+	return res.status(200).send(data);
     }
 }
+
+module.exports = AppController;

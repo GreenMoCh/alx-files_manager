@@ -1,44 +1,36 @@
-import Queue from 'bull';
-import { promises as fs } from 'fs';
-import path from 'path';
-import imageThumbnail from 'image-thumbnail';
-import dbClient from './utils/db';
+import DBClient from './utils/db';
 
-const fileQueue = new Queue('fileQueue');
+const Bull = require('bull');
+const { ObjectId } = require('mongodb');
+const imageThumbnail = require('image-thumbnail');
+const fs = require('fs');
 
-fileQueue.process(async (job, done) => {
-    const { userId, fileId } = job.data;
+const fileQueue = new Bull('fileQueue');
 
-    if (!userId) {
-        return done(new Error('Missing userId'));
-    }
+const createImageThumbnail = async (path, options) => {
+	try {
+		const thumbnail = await imageThumbnail(path, options);
+		const pathNail = `${path}_${options.width}`;
 
-    try {
-        const file = await dbClient.client.db().collection('files').findOne({ _id: fileId, userId });
+		await fs.writeFileSync(pathNail, thumbnail);
+	} catch (error) {
+		console.log(error);
+	}
+};
 
-        if (!file) {
-            return done(new Error('File not found'));
-        }
+fileQueue.process(async (job) => {
+	const { fieldId } = job.data;
+	if (!field) throw new Error('Missing fieldId');
 
-        const sizes = [500, 250, 100];
-        const filePath = file.localPath;
+	const { userId } = job.data;
+	if (!userId) throw new Error('Missing userId');
 
-        for (const size of sizes) {
-            const options = { width: size };
-            const thumbnail = await imageThumbnail(filePath, options);
-            await fs.readFile(`${filePath}_${size}`, thumbnail);
-        }
+	const fileDocument = await DBClient.db
+		.collection('files')
+		.findOne({ _id: ObjectId(fieldId), userId: ObjectId(userId) });
+	if (!fileDocument) throw new Error('File not found');
 
-        done();
-    } catch (error) {
-        done(error);
-    }
-});
-
-fileQueue.on('completed', (job) => {
-    console.log(`Job ${job.id} completed`);
-});
-
-fileQueue.on('failed', (job, err) => {
-    console.log(`Job ${job.id} failed: ${err.message}`);
+	createImageThumbnail(fileDocument.localPath, { width: 500 });
+	createImageThumbnail(fileDocument.localPath, { width: 250 });
+	createImageThumbnail(fileDocument.localPath, { width: 100 });
 });
